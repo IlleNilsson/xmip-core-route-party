@@ -24,19 +24,12 @@
 //!
 //! A route technology does not decide anything: it reads.
 
+use context::property::{PARTY, PARTY_RECEIVER};
 use message::Message;
 use route::{Source, SourceError};
 
 /// The manifest leaf and the prefix a property carries.
 pub const TECHNOLOGY: &str = "party";
-
-/// The context key the accountable Party of the transmission is promoted
-/// under, by the runtime's arrival.
-pub const SENDER_KEY: &str = "xmip.party";
-
-/// The context key the receiving Party is to be promoted under, by Send
-/// preparation.
-pub const RECEIVER_KEY: &str = "xmip.party.receiver";
 
 /// The two names this technology reads.
 pub const NAMES: [&str; 2] = ["sender", "receiver"];
@@ -51,8 +44,8 @@ impl Source for PartySource {
 
     fn read(&self, message: &Message, name: &str) -> Result<Option<String>, SourceError> {
         let key = match name {
-            "sender" => SENDER_KEY,
-            "receiver" => RECEIVER_KEY,
+            "sender" => PARTY,
+            "receiver" => PARTY_RECEIVER,
             other => {
                 return Err(SourceError::new(
                     TECHNOLOGY,
@@ -91,8 +84,8 @@ mod tests {
         // The runtime writes the Party's identifier in its canonical form.
         message(
             MessageContext::new()
-                .with_value(SENDER_KEY, ContextValue::Text(PartyId::new(42).to_string()))
-                .with_value(RECEIVER_KEY, ContextValue::Text("partner-x".into())),
+                .with_value(PARTY, ContextValue::Text(PartyId::new(42).to_string()))
+                .with_value(PARTY_RECEIVER, ContextValue::Text("partner-x".into())),
         )
     }
 
@@ -110,7 +103,8 @@ mod tests {
 
     #[test]
     fn no_party_resolved_is_nothing_promoted_not_an_error() {
-        let anonymous = message(MessageContext::new().with_value(RECEIVER_KEY, ContextValue::Null));
+        let anonymous =
+            message(MessageContext::new().with_value(PARTY_RECEIVER, ContextValue::Null));
         assert_eq!(
             PartySource.read(&anonymous, "sender").expect("readable"),
             None
@@ -130,8 +124,7 @@ mod tests {
         assert_eq!(refused.property, "carrier");
         assert!(refused.reason.contains("sender and receiver"));
 
-        let bytes =
-            message(MessageContext::new().with_value(SENDER_KEY, ContextValue::Binary(vec![7])));
+        let bytes = message(MessageContext::new().with_value(PARTY, ContextValue::Binary(vec![7])));
         let refused = PartySource.read(&bytes, "sender").expect_err("bytes");
         assert!(refused.reason.contains("xmip.party holds 1 bytes"));
     }
