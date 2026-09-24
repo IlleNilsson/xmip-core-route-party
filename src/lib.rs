@@ -19,9 +19,11 @@
 //! preparation, and that key is the name it is to be written under. This
 //! paragraph is the record of that convention.
 //!
+//! Both keys read through `route::routable`: a key not written and a `Null`
+//! are absent, bytes are refused (ADR-0046, amended 2026-09-24).
+//!
 //! A route technology does not decide anything: it reads.
 
-use context::ContextValue;
 use message::Message;
 use route::{Source, SourceError};
 
@@ -63,25 +65,15 @@ impl Source for PartySource {
             }
         };
 
-        match message.context().get(key) {
-            None | Some(ContextValue::Null) => Ok(None),
-            Some(ContextValue::Binary(bytes)) => Err(SourceError::new(
-                TECHNOLOGY,
-                name,
-                format!(
-                    "{key} holds {} bytes, and bytes are not routable as text",
-                    bytes.len()
-                ),
-            )),
-            Some(value) => Ok(route::text_of(value)),
-        }
+        route::routable(key, message.context().get(key))
+            .map_err(|reason| SourceError::new(TECHNOLOGY, name, reason))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use context::MessageContext;
+    use context::{ContextValue, MessageContext};
     use message::MessageTreatment;
     use route::{Predicate, Value};
     use xcore::{MessageId, PartyId};
@@ -118,7 +110,7 @@ mod tests {
 
     #[test]
     fn no_party_resolved_is_nothing_promoted_not_an_error() {
-        let anonymous = message(MessageContext::new());
+        let anonymous = message(MessageContext::new().with_value(RECEIVER_KEY, ContextValue::Null));
         assert_eq!(
             PartySource.read(&anonymous, "sender").expect("readable"),
             None
