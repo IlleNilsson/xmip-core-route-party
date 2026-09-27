@@ -70,9 +70,10 @@ impl Reading for Key {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use context::{ContextValue, MessageContext};
+    use context::MessageContext;
     use message::MessageTreatment;
     use route::{Gathering, Promoted, SourceError};
+    use xcore::ScalarValue;
     use xcore::{MessageId, PartyId};
 
     fn promote(message: &Message, properties: &[&str]) -> Result<Promoted, SourceError> {
@@ -99,8 +100,8 @@ mod tests {
         // The runtime writes the Party's identifier in its canonical form.
         message(
             MessageContext::new()
-                .with_value(PARTY, ContextValue::Text(PartyId::new(42).to_string()))
-                .with_value(PARTY_RECEIVER, ContextValue::Text("partner-x".into())),
+                .with_value(PARTY, ScalarValue::Text(PartyId::new(42).to_string()))
+                .with_value(PARTY_RECEIVER, ScalarValue::Text("partner-x".into())),
         )
     }
 
@@ -119,7 +120,7 @@ mod tests {
     #[test]
     fn no_party_resolved_is_nothing_promoted_not_an_error() {
         let anonymous =
-            message(MessageContext::new().with_value(PARTY_RECEIVER, ContextValue::Null));
+            message(MessageContext::new().with_value(PARTY_RECEIVER, ScalarValue::Null));
         assert_eq!(read(&anonymous, "sender").expect("readable"), None);
         assert_eq!(read(&anonymous, "receiver").expect("readable"), None);
     }
@@ -131,7 +132,7 @@ mod tests {
         assert_eq!(refused.property, "carrier");
         assert!(refused.reason.contains("sender and receiver"));
 
-        let bytes = message(MessageContext::new().with_value(PARTY, ContextValue::Binary(vec![7])));
+        let bytes = message(MessageContext::new().with_value(PARTY, ScalarValue::Binary(vec![7])));
         let refused = read(&bytes, "sender").expect_err("bytes");
         assert!(refused.reason.contains("xmip.party holds 1 bytes"));
     }
