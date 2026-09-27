@@ -26,7 +26,8 @@
 
 use context::property::{PARTY, PARTY_RECEIVER};
 use message::Message;
-use route::{Source, SourceError};
+use path::Content;
+use route::{Reading, Source};
 
 /// The manifest leaf and the prefix a property carries.
 pub const TECHNOLOGY: &str = "party";
@@ -42,24 +43,27 @@ impl Source for PartySource {
         TECHNOLOGY
     }
 
-    fn read(&self, message: &Message, name: &str) -> Result<Option<String>, SourceError> {
+    fn compile(&self, name: &str) -> Result<Box<dyn Reading>, String> {
         let key = match name {
             "sender" => PARTY,
             "receiver" => PARTY_RECEIVER,
-            other => {
-                return Err(SourceError::new(
-                    TECHNOLOGY,
-                    other,
-                    format!(
-                        "not a party a Message has; the parties are {}",
-                        NAMES.join(" and ")
-                    ),
+            _ => {
+                return Err(format!(
+                    "not a party a Message has; the parties are {}",
+                    NAMES.join(" and ")
                 ));
             }
         };
+        Ok(Box::new(Key(key)))
+    }
+}
 
-        route::routable(key, message.context().get(key))
-            .map_err(|reason| SourceError::new(TECHNOLOGY, name, reason))
+/// The context key a party is promoted under.
+struct Key(&'static str);
+
+impl Reading for Key {
+    fn read(&self, message: &Message, _: Option<&Content<'_>>) -> Result<Option<String>, String> {
+        route::routable(self.0, message.context().get(self.0))
     }
 }
 
@@ -68,7 +72,19 @@ mod tests {
     use super::*;
     use context::{ContextValue, MessageContext};
     use message::MessageTreatment;
+    use route::{Gathering, Promoted, SourceError};
     use xcore::{MessageId, PartyId};
+
+    fn promote(message: &Message, properties: &[&str]) -> Result<Promoted, SourceError> {
+        Gathering::new(&[&PartySource], properties).promote(message)
+    }
+
+    fn read(message: &Message, name: &str) -> Result<Option<String>, SourceError> {
+        let property = format!("party:{name}");
+        Ok(promote(message, &[property.as_str()])?
+            .get(&property)
+            .map(str::to_string))
+    }
 
     fn message(context: MessageContext) -> Message {
         Message::received(
@@ -91,11 +107,11 @@ mod tests {
     #[test]
     fn the_sender_is_the_accountable_party_the_runtime_promoted() {
         assert_eq!(
-            PartySource.read(&resolved(), "sender").expect("readable"),
+            read(&resolved(), "sender").expect("readable"),
             Some(PartyId::new(42).to_string())
         );
         assert_eq!(
-            PartySource.read(&resolved(), "receiver").expect("readable"),
+            read(&resolved(), "receiver").expect("readable"),
             Some("partner-x".into())
         );
     }
@@ -104,27 +120,19 @@ mod tests {
     fn no_party_resolved_is_nothing_promoted_not_an_error() {
         let anonymous =
             message(MessageContext::new().with_value(PARTY_RECEIVER, ContextValue::Null));
-        assert_eq!(
-            PartySource.read(&anonymous, "sender").expect("readable"),
-            None
-        );
-        assert_eq!(
-            PartySource.read(&anonymous, "receiver").expect("readable"),
-            None
-        );
+        assert_eq!(read(&anonymous, "sender").expect("readable"), None);
+        assert_eq!(read(&anonymous, "receiver").expect("readable"), None);
     }
 
     #[test]
     fn a_name_that_is_not_a_party_is_refused_naming_the_two() {
-        let refused = PartySource
-            .read(&resolved(), "carrier")
-            .expect_err("refused");
+        let refused = read(&resolved(), "carrier").expect_err("refused");
         assert_eq!(refused.technology, "party");
         assert_eq!(refused.property, "carrier");
         assert!(refused.reason.contains("sender and receiver"));
 
         let bytes = message(MessageContext::new().with_value(PARTY, ContextValue::Binary(vec![7])));
-        let refused = PartySource.read(&bytes, "sender").expect_err("bytes");
+        let refused = read(&bytes, "sender").expect_err("bytes");
         assert!(refused.reason.contains("xmip.party holds 1 bytes"));
     }
 
@@ -132,9 +140,7 @@ mod tests {
     fn the_technology_is_party_and_promote_reads_the_prefixed_property() {
         assert_eq!(PartySource.technology(), "party");
 
-        let sources: [&dyn Source; 1] = [&PartySource];
-        let promoted = route::promote(&resolved(), &sources, &["party:sender", "party:receiver"])
-            .expect("readable");
+        let promoted = promote(&resolved(), &["party:sender", "party:receiver"]).expect("readable");
 
         assert_eq!(
             promoted.get("party:sender"),
