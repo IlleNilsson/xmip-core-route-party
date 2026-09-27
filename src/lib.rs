@@ -68,7 +68,6 @@ mod tests {
     use super::*;
     use context::{ContextValue, MessageContext};
     use message::MessageTreatment;
-    use route::{Predicate, Value};
     use xcore::{MessageId, PartyId};
 
     fn message(context: MessageContext) -> Message {
@@ -142,9 +141,10 @@ mod tests {
             Some(PartyId::new(42).to_string().as_str())
         );
         assert!(
-            Predicate::equals("party:receiver", Value::Text("partner-x".into()))
-                .test(&promoted)
-                .passed()
+            path::expression::Expression::parse("party:receiver = 'partner-x'")
+                .expect("compiles")
+                .evaluate(&promoted)
+                .holds()
         );
     }
 }
