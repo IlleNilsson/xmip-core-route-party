@@ -101,7 +101,7 @@ mod tests {
         message(
             MessageContext::new()
                 .with_value(PARTY, ScalarValue::Text(PartyId::new(42).to_string()))
-                .with_value(PARTY_RECEIVER, ScalarValue::Text("partner-x".into())),
+                .with_value(PARTY_RECEIVER, ScalarValue::Text("party-x".into())),
         )
     }
 
@@ -113,7 +113,7 @@ mod tests {
         );
         assert_eq!(
             read(&resolved(), "receiver").expect("readable"),
-            Some("partner-x".into())
+            Some("party-x".into())
         );
     }
 
@@ -148,7 +148,7 @@ mod tests {
             Some(PartyId::new(42).to_string().as_str())
         );
         assert!(
-            path::expression::Expression::parse("party:receiver = 'partner-x'")
+            path::expression::Expression::parse("party:receiver = 'party-x'")
                 .expect("compiles")
                 .evaluate(&promoted)
                 .holds()
