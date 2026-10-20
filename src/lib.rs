@@ -5,7 +5,7 @@
 //! A Subscription's filter names properties, and each property is read from
 //! one source. This source reads who sent the Message and who will receive it:
 //! `party:sender` and `party:receiver`, each the Party's identifier as text,
-//! or nothing promoted where no Party was resolved — an unrecognised caller is
+//! or nothing promoted where no Party was resolved — an unrecognized caller is
 //! still authenticated or refused on its own terms, and a Party is a shortcut
 //! to an identity, not a permission (ADR-0019 clause 4). ADR-0046.
 //!
