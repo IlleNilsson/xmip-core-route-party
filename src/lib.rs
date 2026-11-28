@@ -148,7 +148,7 @@ mod tests {
             Some(PartyId::new(42).to_string().as_str())
         );
         assert!(
-            path::expression::Expression::parse("party:receiver = 'party-x'")
+            expression::Expression::parse("party:receiver = 'party-x'")
                 .expect("compiles")
                 .evaluate(&promoted)
                 .holds()
